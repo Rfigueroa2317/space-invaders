@@ -131,5 +131,9 @@ public class SpaceInvaders extends Application {
                     rocket.posX + rocket.size / 2, rocket.posY + rocket.size / 2);
             return distance < Rocket.size / 2 + size / 2;
         }
+
+
+
+
     }
 }
