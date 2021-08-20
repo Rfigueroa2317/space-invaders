@@ -131,9 +131,21 @@
 //                    rocket.posX + rocket.size / 2, rocket.posY + rocket.size / 2);
 //            return distance < Rocket.size / 2 + size / 2;
 //        }
-//
-//
-//
-//
 //    }
+//
+//    //environment
+//    public class Universe {
+//        int posX, posY;
+//        private int h,w,r,g,b;
+//        private double opacity;
+//
+//        public Universe() {
+//            posX = Rand.nextInt(Width);
+//            posY = 0;
+//            w = Rand.nextInt(5) + 1;
+//            h = Rand.nextInt(5) + 1;
+//            w = Rand.nextInt(5) + 1;
+//        }
+//    }
+//
 //}
