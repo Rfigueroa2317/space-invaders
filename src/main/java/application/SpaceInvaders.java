@@ -1,13 +1,27 @@
 package application;
 
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Application;
+import javafx.scene.Cursor;
+import javafx.scene.Scene;
+import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.chart.StackedAreaChart;
 import javafx.scene.image.Image;
+import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
+import javafx.scene.text.TextAlignment;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.stream.IntStream;
+
+// CODE IS FINISHED BUT WON'T RUN. NEED TO FIGURE OUT HOW TO RUN IT \\
 
 public class SpaceInvaders extends Application {
 
@@ -38,10 +52,102 @@ public class SpaceInvaders extends Application {
     List<Universe> univ;
     List<Bomb> Bombs;
 
+    private double mouseX;
+    private int score;
 
-    @Override
+
+    //start
     public void start(Stage stage) throws Exception {
+        Canvas canvas = new Canvas(Width, Height);
+        gc = canvas.getGraphicsContext2D();
+        Timeline timeline = new Timeline(new KeyFrame(Duration.millis(100), e -> run(gc)));
+        timeline.setCycleCount(Timeline.INDEFINITE);
+        timeline.play();
+        canvas.setCursor(Cursor.MOVE);
+        canvas.setOnMouseMoved(e -> mouseX = e.getX());
+        canvas.setOnMouseClicked(e -> {
+            if (shots.size() < Max_shots) shots.add(player.shoot());
+            if (gameOver) {
+                gameOver = false;
+                setup();
+            }
+        });
+        setup();
+        stage.setScene(new Scene(new StackPane(canvas)));
+        stage.setTitle("Space invaders");
+        stage.show();
     }
+
+    //setup the game
+    private void setup() {
+        univ = new ArrayList<>();
+        shots = new ArrayList<>();
+        Bombs = new ArrayList<>();
+        player = new Rocket(Width / 2, Height - Player_Size, Player_Size, Player_Img);
+        score = 0;
+        IntStream.range(0, Max_Bombs).mapToObj(i -> this.newBomb()).forEach(Bombs::add);
+    }
+
+    //run Graphics
+    private void run(GraphicsContext gc) {
+        gc.setFill(Color.grayRgb(20));
+        gc.fillRect(0, 0, Width, Height);
+        gc.setTextAlign(TextAlignment.CENTER);
+        gc.setFont(Font.font(20));
+        gc.setFill(Color.WHITE);
+        gc.fillText("Score: " + score, 60, 20);
+
+        if (gameOver) {
+            gc.setFont(Font.font(35));
+            gc.setFill(Color.YELLOW);
+            gc.fillText("Game Over \n Your Score is: " + score + "\n Click to play again",
+                    Width / 2, Height / 2.5);
+        }
+        univ.forEach(Universe::draw);
+
+        player.update();
+        player.draw();
+        player.posX = (int) mouseX;
+
+        Bombs.stream().peek(Rocket::draw).forEach(e -> {
+            if (player.colide(e) && !player.exploding) {
+                player.explode();
+            }
+        });
+
+        for (int i = shots.size() - 1; i >= 0; i--) {
+            Shot shot = shots.get(i);
+            if (shot.posY < 0 || shot.toRemove) {
+                shots.remove(i);
+                continue;
+            }
+            shot.update();
+            shot.draw();
+            for (Bomb bomb : Bombs) {
+                if (shot.colide(bomb) && !bomb.exploding) {
+                    score++;
+                    bomb.explode();
+                    shot.toRemove = true;
+                }
+            }
+        }
+
+        for (int i = Bombs.size() - 1; i >= 0; i--) {
+            if (Bombs.get(i).destroyed) {
+                Bombs.set(i, newBomb());
+            }
+        }
+
+        gameOver = player.destroyed;
+        if (Rand.nextInt(10) > 2) {
+            univ.add(new Universe());
+        }
+        for (int i = 0; i < univ.size(); i++) {
+            if (univ.get(i).posY > Height)
+                univ.remove(i);
+        }
+    }
+
 
     //player
     public class Rocket {
@@ -51,7 +157,7 @@ public class SpaceInvaders extends Application {
         int explosionStep = 0;
 
         //cons
-        public Rocket(int posX, int posY, int size, Image Image) {
+        public Rocket(int posX, int posY, int size, Image image) {
             this.posX = posX;
             this.posY = posY;
             this.size = size;
@@ -67,7 +173,7 @@ public class SpaceInvaders extends Application {
             destroyed = explosionStep > Explosion_steps;
         }
 
-        public draw() {
+        public void draw() {
             if (exploding) {
                 gc.drawImage(Explosion_Img, explosionStep % Explosion_col * Explosion_W,
                         (explosionStep / Explosion_Rows) * Explosion_h + 1, Explosion_W, Explosion_h, posX, posY, size, size);
@@ -77,8 +183,8 @@ public class SpaceInvaders extends Application {
         }
 
         public boolean colide(Rocket other) {
-            int d = distance(this.posX + size / 2, this.posY + size / 2),
-            other.posX + other.site / 2, other.posY + other.size / 2);
+            int d = distance(this.posX + size / 2, this.posY + size / 2,
+            other.posX + other.size / 2, other.posY + other.size / 2);
             return d < other.size / 2 + this.size / 2;
         }
 
@@ -93,12 +199,16 @@ public class SpaceInvaders extends Application {
         int Speed = (score / 5) + 2;
 
         public Bomb(int posX, int posY, int size, Image image) {
-            super.update();
+            super(posX, posY, size, image);
+        }
+
+        public void update(){
             if (!exploding && !destroyed) posY += Speed;
             if (posY > Height) destroyed = true;
         }
     }
 
+    //bullets
     public class Shot {
 
         public boolean toRemove;
@@ -129,14 +239,14 @@ public class SpaceInvaders extends Application {
         public boolean colide(Rocket rocket) {
             int distance = distance(this.posX + size / 2, this.posY + size / 2,
                     rocket.posX + rocket.size / 2, rocket.posY + rocket.size / 2);
-            return distance < Rocket.size / 2 + size / 2;
+            return distance < rocket.size / 2 + size / 2;
         }
     }
 
     //environment
     public class Universe {
         int posX, posY;
-        private int h,w,r,g,b;
+        private int h, w, r, g, b;
         private double opacity;
 
         public Universe() {
@@ -148,24 +258,29 @@ public class SpaceInvaders extends Application {
             g = Rand.nextInt(100) + 150;
             b = Rand.nextInt(100) + 150;
             opacity = Rand.nextFloat();
-            if(opacity < 0) opacity *= -1;
-            if(opacity > 0.5) opacity = 0.5;
+            if (opacity < 0) opacity *= -1;
+            if (opacity > 0.5) opacity = 0.5;
         }
 
         public void draw() {
-            if (opacity > 0.8) opacity -=0.01;
-            if(opacity < 0.1) opacity +=0.01;
-            gc.setFill(Color.rgb(r,g,b,opacity));
+            if (opacity > 0.8) opacity -= 0.01;
+            if (opacity < 0.1) opacity += 0.01;
+            gc.setFill(Color.rgb(r, g, b, opacity));
             gc.fillOval(posX, posY, w, h);
-            posY+=20;
+            posY += 20;
         }
     }
 
     Bomb newBomb() {
-        return new Bomb(50 + Rand.nextInt(Width - 100),0 , Player_Size,
+        return new Bomb(50 + Rand.nextInt(Width - 100), 0, Player_Size,
                 Bombs_img[Rand.nextInt(Bombs_img.length)]);
     }
-    int distance(int x1, int y1, int x2, int y2) {
 
+    int distance(int x1, int y1, int x2, int y2) {
+        return (int) Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2));
+    }
+
+    public static void main(String[] args) {
+        launch();
     }
 }
